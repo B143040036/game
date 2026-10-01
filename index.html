@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>進階版小恐龍 - 雙關卡射擊生存戰</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', monospace, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        canvas {
+            background: linear-gradient(to bottom, #1e293b, #0f172a);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.7);
+        }
+        .btn-action {
+            active: scale-95;
+            transition: transform 0.05s ease, background-color 0.15s;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-2 sm:p-4">
+
+    <!-- 遊戲標頭 HUD -->
+    <div class="w-full max-w-4xl flex flex-wrap justify-between items-center mb-3 bg-slate-800/90 p-3 sm:p-4 rounded-xl border border-slate-700 shadow-xl gap-2">
+        <div>
+            <h1 class="text-base sm:text-xl text-amber-400 font-bold tracking-wider flex items-center gap-2">
+                🦖 恐龍大反擊：雙關挑戰
+            </h1>
+            <p class="text-[10px] sm:text-xs text-slate-400 mt-1 hidden sm:block">
+                [空白鍵/鍵盤上] 二段跳 | [F 鍵/左鍵] 雷射射擊 | [R] 重新開始
+            </p>
+        </div>
+        
+        <div class="flex gap-2 sm:gap-4 text-center text-xs">
+            <div class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[65px]">
+                <span class="text-slate-400 block text-[9px] sm:text-[10px]">關卡</span>
+                <span id="hud-stage" class="text-emerald-400 font-bold text-sm sm:text-base">1</span>
+            </div>
+            <div class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[75px]">
+                <span class="text-slate-400 block text-[9px] sm:text-[10px]">擊殺飛鳥</span>
+                <span id="hud-kills" class="text-cyan-400 font-bold text-sm sm:text-base">0/10</span>
+            </div>
+            <div id="hud-timer-container" class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[75px] hidden">
+                <span class="text-slate-400 block text-[9px] sm:text-[10px]">倒數時間</span>
+                <span id="hud-timer" class="text-rose-400 font-bold text-sm sm:text-base">30s</span>
+            </div>
+            <div class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[80px]">
+                <span class="text-slate-400 block text-[9px] sm:text-[10px]">得分</span>
+                <span id="hud-score" class="text-amber-300 font-bold text-sm sm:text-base">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Canvas 視窗與彈出選單 -->
+    <div class="relative w-full max-w-4xl flex flex-col items-center">
+        <canvas id="gameCanvas" width="900" height="400" class="rounded-xl w-full max-w-[900px] h-auto border border-slate-700/50"></canvas>
+
+        <!-- 遊戲訊息與開始按鈕覆蓋層 -->
+        <div id="msgOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center rounded-xl p-6 text-center z-20">
+            <h2 id="msgTitle" class="text-xl sm:text-3xl text-amber-400 font-bold mb-4 drop-shadow">🦖 準備好出擊了嗎？</h2>
+            <p id="msgDesc" class="text-xs sm:text-sm text-slate-300 mb-6 leading-relaxed max-w-md">
+                【第一關】消滅 <span class="text-cyan-400 font-bold">10 隻飛行機械鳥</span>！<br>
+                注意：地面仙人掌無法被射擊，請善用<span class="text-emerald-400 font-bold">二段跳</span>避開！
+            </p>
+            <button id="startBtn" class="btn-action bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-sm sm:text-base font-bold px-8 py-4 rounded-xl shadow-lg border border-emerald-400/30 cursor-pointer">
+                開始遊戲 (START GAME)
+            </button>
+        </div>
+    </div>
+
+    <!-- 手機與觸控螢幕操作按鈕區 -->
+    <div class="w-full max-w-4xl mt-3 grid grid-cols-2 gap-3 sm:gap-4">
+        <button id="btnJump" class="btn-action bg-slate-800 active:bg-emerald-600 hover:bg-slate-700 text-emerald-400 active:text-white border-2 border-emerald-500/50 py-4 sm:py-5 rounded-xl text-sm sm:text-base font-bold shadow-lg flex items-center justify-center gap-2 select-none">
+            🦘 跳躍 / 二段跳 (JUMP)
+        </button>
+        <button id="btnShoot" class="btn-action bg-slate-800 active:bg-amber-600 hover:bg-slate-700 text-amber-400 active:text-white border-2 border-amber-500/50 py-4 sm:py-5 rounded-xl text-sm sm:text-base font-bold shadow-lg flex items-center justify-center gap-2 select-none">
+            🔥 雷射射擊 (SHOOT)
+        </button>
+    </div>
+
+    <script>
+        // Web Audio API 音效合成器 (完全不依賴外部檔案)
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playJump() {
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+
+            playShoot() {
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            }
+
+            playExplode() {
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            }
+
+            playVictory() {
+                if (!this.ctx) return;
+                let now = this.ctx.currentTime;
+                [261, 329, 392, 523].forEach((freq, idx) => {
+                    let osc = this.ctx.createOscillator();
+                    let gain = this.ctx.createGain();
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+                    gain.gain.setValueAtTime(0.15, now + idx * 0.1);
+                    gain.gain.linearRampToValueAtTime(0.01, now + idx * 0.1 + 0.2);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.1);
+                    osc.stop(now + idx * 0.1 + 0.25);
+                });
+            }
+        }
+
+        const soundFX = new SoundFX();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const hudStage = document.getElementById('hud-stage');
+        const hudKills = document.getElementById('hud-kills');
+        const hudTimerContainer = document.getElementById('hud-timer-container');
+        const hudTimer = document.getElementById('hud-timer');
+        const hudScore = document.getElementById('hud-score');
+        const msgOverlay = document.getElementById('msgOverlay');
+        const msgTitle = document.getElementById('msgTitle');
+        const msgDesc = document.getElementById('msgDesc');
+        const startBtn = document.getElementById('startBtn');
+        const btnJump = document.getElementById('btnJump');
+        const btnShoot = document.getElementById('btnShoot');
+
+        let gameActive = false;
+        let stage = 1;
+        let birdsKilled = 0;
+        let stageTimer = 30;
+        let timerInterval = null;
+        let score = 0;
+        let gameSpeed = 6;
+        let groundY = 330;
+
+        let player = null;
+        let entities = [];
+        let particles = [];
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 8;
+                this.vy = (Math.random() - 0.5) * 8;
+                this.radius = Math.random() * 3 + 2;
+                this.color = color;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.03 + 0.02;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function createExplosion(x, y, color = '#f59e0b') {
+            for (let i = 0; i < 15; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        class Entity {
+            constructor(x, y, width, height, type) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.type = type; // 'player', 'cactus', 'bird', 'bullet'
+                this.isDead = false;
+            }
+
+            getBounds() {
+                return {
+                    minX: this.x,
+                    maxX: this.x + this.width,
+                    minY: this.y,
+                    maxY: this.y + this.height
+                };
+            }
+
+            update() {}
+            draw(ctx) {}
+            onCollision(other) {}
+        }
+
+        class Player extends Entity {
+            constructor(x, y) {
+                super(x, y, 44, 52, 'player');
+                this.vy = 0;
+                this.gravity = 0.75;
+                this.jumpStrength = -13;
+                this.startY = groundY - this.height;
+                this.jumpsLeft = 2;
+                this.cooldown = 0;
+                this.animFrame = 0;
+            }
+
+            jump() {
+                soundFX.init();
+                if (this.jumpsLeft > 0) {
+                    this.vy = this.jumpStrength;
+                    this.jumpsLeft--;
+                    soundFX.playJump();
+                    createExplosion(this.x + this.width / 2, this.y + this.height, '#94a3b8');
+                }
+            }
+
+            shoot() {
+                soundFX.init();
+                if (this.cooldown <= 0) {
+                    entities.push(new Bullet(this.x + this.width + 4, this.y + 18));
+                    this.cooldown = 12;
+                    soundFX.playShoot();
+                    createExplosion(this.x + this.width, this.y + 20, '#fbbf24');
+                }
+            }
+
+            update() {
+                if (this.cooldown > 0) this.cooldown--;
+                this.animFrame += 0.2;
+
+                this.vy += this.gravity;
+                this.y += this.vy;
+
+                if (this.y >= this.startY) {
+                    this.y = this.startY;
+                    this.vy = 0;
+                    this.jumpsLeft = 2;
+                }
+            }
+
+            draw(ctx) {
+                // 恐龍身體
+                ctx.fillStyle = '#10b981';
+                ctx.fillRect(this.x + 8, this.y + 12, 28, 28);
+                // 頭部
+                ctx.fillRect(this.x + 20, this.y, 22, 20);
+                // 眼睛
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(this.x + 32, this.y + 4, 6, 6);
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(this.x + 35, this.y + 5, 3, 3);
+                // 手槍
+                ctx.fillStyle = '#64748b';
+                ctx.fillRect(this.x + 32, this.y + 18, 12, 6);
+
+                // 腳部動畫
+                ctx.fillStyle = '#047857';
+                let legOffset = Math.sin(this.animFrame) * 6;
+                if (this.y < this.startY) legOffset = 4; // 空中姿態
+                ctx.fillRect(this.x + 12, this.y + 40, 8, 10 + legOffset);
+                ctx.fillRect(this.x + 24, this.y + 40, 8, 10 - legOffset);
+            }
+
+            onCollision(other) {
+                if (other.type === 'cactus' || other.type === 'bird') {
+                    soundFX.playExplode();
+                    createExplosion(this.x + 20, this.y + 20, '#ef4444');
+                    gameOver("遭障礙物撞擊！遊戲結束！");
+                }
+            }
+        }
+
+        class Bullet extends Entity {
+            constructor(x, y) {
+                super(x, y, 18, 6, 'bullet');
+                this.speed = 14;
+            }
+
+            update() {
+                this.x += this.speed;
+                if (this.x > canvas.width) {
+                    this.isDead = true;
+                }
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = '#f59e0b';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.fillStyle = '#fef08a';
+                ctx.fillRect(this.x + 2, this.y + 1, this.width - 4, this.height - 2);
+            }
+
+            onCollision(other) {
+                if (other.type === 'bird') {
+                    this.isDead = true;
+                    other.isDead = true;
+                    soundFX.playExplode();
+                    createExplosion(other.x + 18, other.y + 14, '#38bdf8');
+                    score += 100;
+                    hudScore.innerText = score;
+
+                    if (stage === 1) {
+                        birdsKilled++;
+                        hudKills.innerText = `${birdsKilled}/10`;
+                        if (birdsKilled >= 10) {
+                            transitionToStage2();
+                        }
+                    }
+                }
+            }
+        }
+
+        class Cactus extends Entity {
+            constructor(x) {
+                super(x, groundY - 46, 26, 46, 'cactus');
+            }
+
+            update() {
+                this.x -= gameSpeed;
+                if (this.x + this.width < 0) this.isDead = true;
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = '#16a34a';
+                ctx.fillRect(this.x + 8, this.y, 10, this.height);
+                ctx.fillRect(this.x, this.y + 12, 8, 16);
+                ctx.fillRect(this.x + 18, this.y + 8, 8, 16);
+            }
+        }
+
+        class Bird extends Entity {
+            constructor(x) {
+                let flyHeight = Math.random() > 0.5 ? groundY - 90 : groundY - 140;
+                super(x, flyHeight, 38, 28, 'bird');
+                this.speed = gameSpeed + 2.5;
+                this.wingFrame = 0;
+            }
+
+            update() {
+                this.x -= this.speed;
+                this.wingFrame += 0.25;
+                if (this.x + this.width < 0) this.isDead = true;
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = '#0284c7';
+                ctx.beginPath();
+                ctx.ellipse(this.x + 19, this.y + 14, 16, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 鳥嘴
+                ctx.fillStyle = '#f97316';
+                ctx.beginPath();
+                ctx.moveTo(this.x + 6, this.y + 12);
+                ctx.lineTo(this.x - 4, this.y + 16);
+                ctx.lineTo(this.x + 6, this.y + 18);
+                ctx.fill();
+
+                // 翅膀拍打
+                ctx.fillStyle = '#38bdf8';
+                let wingY = Math.sin(this.wingFrame) * 10;
+                ctx.fillRect(this.x + 14, this.y + 4 + wingY, 12, 6);
+            }
+        }
+
+        class CollisionSystem {
+            update(entityList) {
+                // 利用 Sweep and Prune (依照 minX 排序 $O(N \log N)$)
+                entityList.sort((a, b) => a.getBounds().minX - b.getBounds().minX);
+
+                let activeList = [];
+
+                for (let i = 0; i < entityList.length; i++) {
+                    let current = entityList[i];
+                    if (current.isDead) continue;
+                    let currentBox = current.getBounds();
+
+                    // 過濾不可能相交的舊物件
+                    activeList = activeList.filter(e => !e.isDead && e.getBounds().maxX >= currentBox.minX);
+
+                    for (let active of activeList) {
+                        if (active === current) continue;
+                        if (this.checkAABB(current, active)) {
+                            current.onCollision(active);
+                            active.onCollision(current);
+                        }
+                    }
+
+                    activeList.push(current);
+                }
+            }
+
+            checkAABB(a, b) {
+                let boxA = a.getBounds();
+                let boxB = b.getBounds();
+                return (
+                    boxA.minX < boxB.maxX &&
+                    boxA.maxX > boxB.minX &&
+                    boxA.minY < boxB.maxY &&
+                    boxA.maxY > boxB.minY
+                );
+            }
+        }
+
+        const collisionSystem = new CollisionSystem();
+        let spawnTimer = 0;
+
+        function spawnEntities() {
+            spawnTimer++;
+            let spawnInterval = stage === 1 ? 85 : 55;
+            if (spawnTimer >= spawnInterval) {
+                spawnTimer = 0;
+                let rand = Math.random();
+                if (stage === 2) {
+                    if (rand > 0.4) entities.push(new Bird(canvas.width));
+                    else entities.push(new Cactus(canvas.width));
+                } else {
+                    if (rand > 0.5) entities.push(new Cactus(canvas.width));
+                    else entities.push(new Bird(canvas.width));
+                }
+            }
+        }
+
+        function transitionToStage2() {
+            gameActive = false;
+            stage = 2;
+            hudStage.innerText = "2";
+            gameSpeed = 8;
+            soundFX.playVictory();
+
+            // 清理所有子彈與敵人，避免轉場交界殘留
+            entities = entities.filter(e => e === player);
+
+            hudTimerContainer.classList.remove('hidden');
+            stageTimer = 30;
+            hudTimer.innerText = `${stageTimer}s`;
+
+            if (timerInterval) clearInterval(timerInterval);
+
+            msgOverlay.classList.remove('hidden');
+            msgTitle.innerText = "🎉 第一關通關！進入【第二關】";
+            msgDesc.innerHTML = `成功擊殺 10 隻飛鳥！<br><span class="text-rose-400 font-bold">第二關考驗：30 秒高強度極限生存</span><br>障礙物與飛鳥速度將大幅提升！`;
+            startBtn.innerText = "開始第二關挑戰";
+        }
+
+        function gameVictory() {
+            gameActive = false;
+            soundFX.playVictory();
+            if (timerInterval) clearInterval(timerInterval);
+            msgOverlay.classList.remove('hidden');
+            msgTitle.innerText = "🏆 恭喜通關全關卡！";
+            msgDesc.innerHTML = `你成功突破了 30 秒極限生存！<br>最終得分：<span class="text-amber-300 font-bold text-lg">${score}</span>`;
+            startBtn.innerText = "再玩一次 (REPLAY)";
+        }
+
+        function gameOver(reason) {
+            gameActive = false;
+            if (timerInterval) clearInterval(timerInterval);
+            msgOverlay.classList.remove('hidden');
+            msgTitle.innerText = "💥 遊戲結束 (GAME OVER)";
+            msgDesc.innerHTML = `${reason}<br>得分：<span class="text-amber-300 font-bold">${score}</span>`;
+            startBtn.innerText = "重新開始";
+        }
+
+        function initGame() {
+            soundFX.init();
+            stage = 1;
+            birdsKilled = 0;
+            score = 0;
+            gameSpeed = 6;
+            hudStage.innerText = "1";
+            hudKills.innerText = "0/10";
+            hudScore.innerText = "0";
+            hudTimerContainer.classList.add('hidden');
+            if (timerInterval) clearInterval(timerInterval);
+
+            player = new Player(80, groundY - 52);
+            entities = [player];
+            particles = [];
+            spawnTimer = 0;
+            gameActive = true;
+            msgOverlay.classList.add('hidden');
+        }
+
+        function startStage2Timer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!gameActive) return;
+                stageTimer--;
+                hudTimer.innerText = `${stageTimer}s`;
+                if (stageTimer <= 0) {
+                    clearInterval(timerInterval);
+                    gameVictory();
+                }
+            }, 1000);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'ArrowUp') {
+                e.preventDefault();
+                if (gameActive && player) player.jump();
+            }
+            if (e.code === 'KeyF' || e.code === 'KeyX') {
+                e.preventDefault();
+                if (gameActive && player) player.shoot();
+            }
+            if (e.code === 'KeyR') {
+                initGame();
+            }
+        });
+
+        // 按鈕點擊與觸控支援
+        btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); if (gameActive && player) player.jump(); });
+        btnJump.addEventListener('click', () => { if (gameActive && player) player.jump(); });
+
+        btnShoot.addEventListener('touchstart', (e) => { e.preventDefault(); if (gameActive && player) player.shoot(); });
+        btnShoot.addEventListener('click', () => { if (gameActive && player) player.shoot(); });
+
+        startBtn.addEventListener('click', () => {
+            if (stage === 2 && stageTimer === 30 && !gameActive && birdsKilled >= 10) {
+                gameActive = true;
+                msgOverlay.classList.add('hidden');
+                startStage2Timer();
+            } else {
+                initGame();
+            }
+        });
+
+        function gameLoop() {
+            if (gameActive) {
+                score += 1;
+                hudScore.innerText = score;
+                spawnEntities();
+
+                for (let e of entities) e.update();
+                for (let p of particles) p.update();
+
+                particles = particles.filter(p => p.alpha > 0);
+                collisionSystem.update(entities);
+                entities = entities.filter(e => !e.isDead);
+            }
+
+            // 清空畫布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 繪製跑道與地面細節
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, groundY, canvas.width, 4);
+
+            // 繪製背景裝飾線條
+            ctx.fillStyle = '#475569';
+            for (let i = 0; i < canvas.width; i += 60) {
+                ctx.fillRect((i - (score * gameSpeed * 0.2) % 60), groundY + 20, 20, 2);
+            }
+
+            // 繪製所有實體與粒子
+            for (let e of entities) e.draw(ctx);
+            for (let p of particles) p.draw(ctx);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
