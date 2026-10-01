@@ -20,8 +20,10 @@
             box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.7);
         }
         .btn-action {
-            active: scale-95;
             transition: transform 0.05s ease, background-color 0.15s;
+        }
+        .btn-action:active {
+            transform: scale(0.95);
         }
     </style>
 </head>
@@ -34,7 +36,7 @@
                 🦖 恐龍大反擊：雙關挑戰
             </h1>
             <p class="text-[10px] sm:text-xs text-slate-400 mt-1 hidden sm:block">
-                [空白鍵/鍵盤上] 二段跳 | [F 鍵/左鍵] 雷射射擊 | [R] 重新開始
+                [空白鍵/鍵盤上] 二段跳 | [F 鍵/X 鍵] 雷射射擊 | [R] 重新開始
             </p>
         </div>
         
@@ -84,16 +86,15 @@
 
     <!-- 手機與觸控螢幕操作按鈕區 -->
     <div class="w-full max-w-4xl mt-3 grid grid-cols-2 gap-3 sm:gap-4">
-        <button id="btnJump" class="btn-action bg-slate-800 active:bg-emerald-600 hover:bg-slate-700 text-emerald-400 active:text-white border-2 border-emerald-500/50 py-4 sm:py-5 rounded-xl text-sm sm:text-base font-bold shadow-lg flex items-center justify-center gap-2 select-none">
+        <button id="btnJump" class="btn-action bg-slate-800 active:bg-emerald-600 hover:bg-slate-700 text-emerald-400 active:text-white border-2 border-emerald-500/50 py-4 sm:py-5 rounded-xl text-sm sm:text-base font-bold shadow-lg flex items-center justify-center gap-2 select-none cursor-pointer">
             🦘 跳躍 / 二段跳 (JUMP)
         </button>
-        <button id="btnShoot" class="btn-action bg-slate-800 active:bg-amber-600 hover:bg-slate-700 text-amber-400 active:text-white border-2 border-amber-500/50 py-4 sm:py-5 rounded-xl text-sm sm:text-base font-bold shadow-lg flex items-center justify-center gap-2 select-none">
+        <button id="btnShoot" class="btn-action bg-slate-800 active:bg-amber-600 hover:bg-slate-700 text-amber-400 active:text-white border-2 border-amber-500/50 py-4 sm:py-5 rounded-xl text-sm sm:text-base font-bold shadow-lg flex items-center justify-center gap-2 select-none cursor-pointer">
             🔥 雷射射擊 (SHOOT)
         </button>
     </div>
 
     <script>
-        // Web Audio API 音效合成器 (完全不依賴外部檔案)
         class SoundFX {
             constructor() {
                 this.ctx = null;
@@ -101,69 +102,83 @@
 
             init() {
                 if (!this.ctx) {
-                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) {
+                        this.ctx = new AudioContextClass();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
                 }
             }
 
             playJump() {
                 if (!this.ctx) return;
-                let osc = this.ctx.createOscillator();
-                let gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.15);
-                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.15);
+                try {
+                    let osc = this.ctx.createOscillator();
+                    let gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.15);
+                } catch(e){}
             }
 
             playShoot() {
                 if (!this.ctx) return;
-                let osc = this.ctx.createOscillator();
-                let gain = this.ctx.createGain();
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
-                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.1);
+                try {
+                    let osc = this.ctx.createOscillator();
+                    let gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.1);
+                } catch(e){}
             }
 
             playExplode() {
                 if (!this.ctx) return;
-                let osc = this.ctx.createOscillator();
-                let gain = this.ctx.createGain();
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.2);
-                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
-                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.2);
+                try {
+                    let osc = this.ctx.createOscillator();
+                    let gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.2);
+                } catch(e){}
             }
 
             playVictory() {
                 if (!this.ctx) return;
-                let now = this.ctx.currentTime;
-                [261, 329, 392, 523].forEach((freq, idx) => {
-                    let osc = this.ctx.createOscillator();
-                    let gain = this.ctx.createGain();
-                    osc.frequency.setValueAtTime(freq, now + idx * 0.1);
-                    gain.gain.setValueAtTime(0.15, now + idx * 0.1);
-                    gain.gain.linearRampToValueAtTime(0.01, now + idx * 0.1 + 0.2);
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start(now + idx * 0.1);
-                    osc.stop(now + idx * 0.1 + 0.25);
-                });
+                try {
+                    let now = this.ctx.currentTime;
+                    [261, 329, 392, 523].forEach((freq, idx) => {
+                        let osc = this.ctx.createOscillator();
+                        let gain = this.ctx.createGain();
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+                        gain.gain.setValueAtTime(0.15, now + idx * 0.1);
+                        gain.gain.linearRampToValueAtTime(0.01, now + idx * 0.1 + 0.2);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + idx * 0.1);
+                        osc.stop(now + idx * 0.1 + 0.25);
+                    });
+                } catch(e){}
             }
         }
 
@@ -194,11 +209,12 @@
         let score = 0;
         let highScore = loadHighScore();
         let gameSpeed = 6;
-        let groundY = 330;
+        const groundY = 330;
 
         let player = null;
         let entities = [];
         let particles = [];
+        let spawnTimer = 0;
 
         function loadHighScore() {
             try {
@@ -224,25 +240,6 @@
         }
 
         hudHighScore.innerText = highScore;
-
-        const msgTitle = document.getElementById('msgTitle');
-        const msgDesc = document.getElementById('msgDesc');
-        const startBtn = document.getElementById('startBtn');
-        const btnJump = document.getElementById('btnJump');
-        const btnShoot = document.getElementById('btnShoot');
-
-        let gameActive = false;
-        let stage = 1;
-        let birdsKilled = 0;
-        let stageTimer = 30;
-        let timerInterval = null;
-        let score = 0;
-        let gameSpeed = 6;
-        let groundY = 330;
-
-        let player = null;
-        let entities = [];
-        let particles = [];
 
         class Particle {
             constructor(x, y, color) {
@@ -476,7 +473,7 @@
 
         class CollisionSystem {
             update(entityList) {
-                // 利用 Sweep and Prune (依照 minX 排序 $O(N \log N)$)
+                // 利用 Sweep and Prune (依照 minX 排序 O(N log N))
                 entityList.sort((a, b) => a.getBounds().minX - b.getBounds().minX);
 
                 let activeList = [];
@@ -514,7 +511,6 @@
         }
 
         const collisionSystem = new CollisionSystem();
-        let spawnTimer = 0;
 
         function spawnEntities() {
             spawnTimer++;
@@ -559,6 +555,19 @@
                 </div>
             `;
             startBtn.innerText = "開始第二關挑戰";
+        }
+
+        function startStage2Timer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!gameActive) return;
+                stageTimer--;
+                hudTimer.innerText = `${stageTimer}s`;
+                if (stageTimer <= 0) {
+                    clearInterval(timerInterval);
+                    gameVictory();
+                }
+            }, 1000);
         }
 
         function gameVictory() {
@@ -642,15 +651,6 @@
             msgOverlay.classList.add('hidden');
         }
 
-        function startStage2Timer() {
-            if (timerInterval) clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                if (!gameActive) return;
-                stageTimer--;
-                hudTimer.innerText = `${stageTimer}s`;
-                if (stageTimer <= 0) {
-                    clearInterval(timerInterval);
-        // 重新開始與控制按鈕監聽
         btnRestartTop.addEventListener('click', () => {
             initGame();
         });
@@ -722,7 +722,9 @@
             requestAnimationFrame(gameLoop);
         }
 
-        requestAnimationFrame(gameLoop);
+        window.onload = function() {
+            requestAnimationFrame(gameLoop);
+        };
     </script>
 </body>
 </html>
