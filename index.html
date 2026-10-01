@@ -38,23 +38,30 @@
             </p>
         </div>
         
-        <div class="flex gap-2 sm:gap-4 text-center text-xs">
-            <div class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[65px]">
+        <div class="flex flex-wrap gap-2 sm:gap-3 text-center text-xs items-center">
+            <div class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[55px]">
                 <span class="text-slate-400 block text-[9px] sm:text-[10px]">關卡</span>
                 <span id="hud-stage" class="text-emerald-400 font-bold text-sm sm:text-base">1</span>
             </div>
-            <div class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[75px]">
+            <div class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[65px]">
                 <span class="text-slate-400 block text-[9px] sm:text-[10px]">擊殺飛鳥</span>
                 <span id="hud-kills" class="text-cyan-400 font-bold text-sm sm:text-base">0/10</span>
             </div>
-            <div id="hud-timer-container" class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[75px] hidden">
-                <span class="text-slate-400 block text-[9px] sm:text-[10px]">倒數時間</span>
+            <div id="hud-timer-container" class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[65px] hidden">
+                <span class="text-slate-400 block text-[9px] sm:text-[10px]">倒數</span>
                 <span id="hud-timer" class="text-rose-400 font-bold text-sm sm:text-base">30s</span>
             </div>
-            <div class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[80px]">
+            <div class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[65px]">
                 <span class="text-slate-400 block text-[9px] sm:text-[10px]">得分</span>
                 <span id="hud-score" class="text-amber-300 font-bold text-sm sm:text-base">0</span>
             </div>
+            <div class="bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700 min-w-[70px]">
+                <span class="text-slate-400 block text-[9px] sm:text-[10px]">最高紀錄</span>
+                <span id="hud-highscore" class="text-purple-400 font-bold text-sm sm:text-base">0</span>
+            </div>
+            <button id="btnRestartTop" class="btn-action bg-rose-900/80 hover:bg-rose-700 text-rose-200 border border-rose-500/50 px-3 py-2 rounded-lg text-xs font-bold shadow transition cursor-pointer">
+                🔄 重來
+            </button>
         </div>
     </div>
 
@@ -65,10 +72,10 @@
         <!-- 遊戲訊息與開始按鈕覆蓋層 -->
         <div id="msgOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center rounded-xl p-6 text-center z-20">
             <h2 id="msgTitle" class="text-xl sm:text-3xl text-amber-400 font-bold mb-4 drop-shadow">🦖 準備好出擊了嗎？</h2>
-            <p id="msgDesc" class="text-xs sm:text-sm text-slate-300 mb-6 leading-relaxed max-w-md">
+            <div id="msgDesc" class="text-xs sm:text-sm text-slate-300 mb-6 leading-relaxed max-w-md">
                 【第一關】消滅 <span class="text-cyan-400 font-bold">10 隻飛行機械鳥</span>！<br>
                 注意：地面仙人掌無法被射擊，請善用<span class="text-emerald-400 font-bold">二段跳</span>避開！
-            </p>
+            </div>
             <button id="startBtn" class="btn-action bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-sm sm:text-base font-bold px-8 py-4 rounded-xl shadow-lg border border-emerald-400/30 cursor-pointer">
                 開始遊戲 (START GAME)
             </button>
@@ -170,7 +177,54 @@
         const hudTimerContainer = document.getElementById('hud-timer-container');
         const hudTimer = document.getElementById('hud-timer');
         const hudScore = document.getElementById('hud-score');
+        const hudHighScore = document.getElementById('hud-highscore');
         const msgOverlay = document.getElementById('msgOverlay');
+        const msgTitle = document.getElementById('msgTitle');
+        const msgDesc = document.getElementById('msgDesc');
+        const startBtn = document.getElementById('startBtn');
+        const btnJump = document.getElementById('btnJump');
+        const btnShoot = document.getElementById('btnShoot');
+        const btnRestartTop = document.getElementById('btnRestartTop');
+
+        let gameActive = false;
+        let stage = 1;
+        let birdsKilled = 0;
+        let stageTimer = 30;
+        let timerInterval = null;
+        let score = 0;
+        let highScore = loadHighScore();
+        let gameSpeed = 6;
+        let groundY = 330;
+
+        let player = null;
+        let entities = [];
+        let particles = [];
+
+        function loadHighScore() {
+            try {
+                return parseInt(localStorage.getItem('dino_highscore') || '0', 10);
+            } catch (e) {
+                return 0;
+            }
+        }
+
+        function saveHighScore(currentScore) {
+            let isNew = false;
+            if (currentScore > highScore) {
+                highScore = currentScore;
+                isNew = true;
+                try {
+                    localStorage.setItem('dino_highscore', highScore.toString());
+                } catch (e) {
+                    console.log('LocalStorage unavailable');
+                }
+            }
+            hudHighScore.innerText = highScore;
+            return isNew;
+        }
+
+        hudHighScore.innerText = highScore;
+
         const msgTitle = document.getElementById('msgTitle');
         const msgDesc = document.getElementById('msgDesc');
         const startBtn = document.getElementById('startBtn');
@@ -485,7 +539,6 @@
             gameSpeed = 8;
             soundFX.playVictory();
 
-            // 清理所有子彈與敵人，避免轉場交界殘留
             entities = entities.filter(e => e === player);
 
             hudTimerContainer.classList.remove('hidden');
@@ -496,7 +549,15 @@
 
             msgOverlay.classList.remove('hidden');
             msgTitle.innerText = "🎉 第一關通關！進入【第二關】";
-            msgDesc.innerHTML = `成功擊殺 10 隻飛鳥！<br><span class="text-rose-400 font-bold">第二關考驗：30 秒高強度極限生存</span><br>障礙物與飛鳥速度將大幅提升！`;
+            msgDesc.innerHTML = `
+                <div class="space-y-2">
+                    <p class="text-emerald-400 font-bold">成功擊殺 10 隻飛鳥！</p>
+                    <p class="text-xs text-slate-300">當前得分：<span class="text-amber-300 font-bold">${score}</span></p>
+                    <hr class="border-slate-700 my-2">
+                    <p class="text-rose-400 font-bold">第二關考驗：30 秒高強度極限生存</p>
+                    <p class="text-xs text-slate-400">障礙物與飛鳥速度大幅提升，堅持到底即獲勝！</p>
+                </div>
+            `;
             startBtn.innerText = "開始第二關挑戰";
         }
 
@@ -504,19 +565,60 @@
             gameActive = false;
             soundFX.playVictory();
             if (timerInterval) clearInterval(timerInterval);
+
+            const isNewRecord = saveHighScore(score);
+
             msgOverlay.classList.remove('hidden');
             msgTitle.innerText = "🏆 恭喜通關全關卡！";
-            msgDesc.innerHTML = `你成功突破了 30 秒極限生存！<br>最終得分：<span class="text-amber-300 font-bold text-lg">${score}</span>`;
+            msgDesc.innerHTML = `
+                <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 text-left space-y-2 text-xs sm:text-sm">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">遊戲結果：</span>
+                        <span class="text-emerald-400 font-bold">完美通關 (VICTORY)</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">最終得分：</span>
+                        <span class="text-amber-300 font-bold text-base">${score}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">最高紀錄：</span>
+                        <span class="text-purple-400 font-bold">${highScore} ${isNewRecord ? '🔥 (新紀錄!)' : ''}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">擊殺總數：</span>
+                        <span class="text-cyan-400 font-bold">${birdsKilled} 隻</span>
+                    </div>
+                </div>
+            `;
             startBtn.innerText = "再玩一次 (REPLAY)";
         }
 
         function gameOver(reason) {
             gameActive = false;
             if (timerInterval) clearInterval(timerInterval);
+
+            const isNewRecord = saveHighScore(score);
+
             msgOverlay.classList.remove('hidden');
             msgTitle.innerText = "💥 遊戲結束 (GAME OVER)";
-            msgDesc.innerHTML = `${reason}<br>得分：<span class="text-amber-300 font-bold">${score}</span>`;
-            startBtn.innerText = "重新開始";
+            msgDesc.innerHTML = `
+                <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 text-left space-y-2 text-xs sm:text-sm">
+                    <p class="text-rose-400 font-bold text-center mb-2">${reason}</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">挑戰關卡：</span>
+                        <span class="text-emerald-400 font-bold">第 ${stage} 關</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">本次得分：</span>
+                        <span class="text-amber-300 font-bold text-base">${score}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">最高紀錄：</span>
+                        <span class="text-purple-400 font-bold">${highScore} ${isNewRecord ? '🔥 (新紀錄!)' : ''}</span>
+                    </div>
+                </div>
+            `;
+            startBtn.innerText = "重新開始 (RETRY)";
         }
 
         function initGame() {
@@ -528,6 +630,7 @@
             hudStage.innerText = "1";
             hudKills.innerText = "0/10";
             hudScore.innerText = "0";
+            hudHighScore.innerText = highScore;
             hudTimerContainer.classList.add('hidden');
             if (timerInterval) clearInterval(timerInterval);
 
@@ -547,10 +650,10 @@
                 hudTimer.innerText = `${stageTimer}s`;
                 if (stageTimer <= 0) {
                     clearInterval(timerInterval);
-                    gameVictory();
-                }
-            }, 1000);
-        }
+        // 重新開始與控制按鈕監聽
+        btnRestartTop.addEventListener('click', () => {
+            initGame();
+        });
 
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space' || e.code === 'ArrowUp') {
